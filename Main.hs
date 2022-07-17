@@ -1,8 +1,9 @@
--- Needed for case lambda to work; see line 82
+-- Needed for case lambda to work; see line 82.
 {-# LANGUAGE LambdaCase #-}
 
--- To be able to implement and use Alternative
+-- To be able to implement and use Alternative.
 import Control.Applicative
+-- To be able to use isDigit and isSpace.
 import GHC.Unicode
 
 {--
@@ -19,25 +20,25 @@ data JsonValue =
  deriving(Eq, Show)
 
 {--
-Parser is a new record type that has one field - `runParser`
+Parser is a new record type that has one named field - `runParser`.
 Haskell automagically generates functions with the same names as records fields
 So the type of `runParser` is `runParser :: Parser a -> String -> Maybe (String, a)`
-Then we can do `runParser someAtrbitraryParser`, say `runParser Parser JsonValue`
-And the resulting type will be `Maybe (String, JsonValue)`
+Then we can do `runParser someArbitraryParser`, say `runParser Parser JsonValue`,
+and the resulting type will be `Maybe (String, JsonValue)`.
 --}
 newtype Parser a = Parser {
   runParser :: String -> Maybe (String, a)
 }
 
 {--
-We need to implement an instance of a Functor for Praser.
+We need to implement an instance of a Functor for Parser.
 Basically kinda like implementing an interface.
 
 We need it in order to implement an instance of Applicative.
 
 The bare minimum for a Functor is to implement `fmap`, so we do just that.
 The do notation is still a little bit of a weirdness to me (quite imperative), but it.. works.
-Without I'd have to write some case expressiond and shits I suppose.
+Without I'd have to write some case expressions and shits I suppose.
 --}
 instance Functor Parser where
   fmap f (Parser p) = Parser $ 
@@ -57,13 +58,20 @@ instance Applicative Parser where
     (rest', a) <- p2 rest
     Just (rest', f a)
 
+{--
+`Alternative` is an operation that has a notion of an empty Alternative and the alternative operator.
 
+The alternative operator returns whichever side is not empty.
+
+That is - for our parser an `empty` parser is one, that's failed - `Parser $ \_ -> Nothing`
+And the alternative operator makes use of the fact that the stored maybe is also an alternative.
+--}
 instance Alternative Parser where
   empty = Parser $ const Nothing
   (<|>) (Parser p1) (Parser p2) = Parser $ \input -> p1 input <|>  p2 input
 
 {--
-So the charPaser takes a character and returns a parser that parses it.
+charPaser takes a character and returns a parser that parses it.
 charParser 'x' returns
   \str -> case str of
     y:ys | y == 'x' -> Just (ys, c)
@@ -79,7 +87,7 @@ The pattern matching checks
     Then it returns Nothing
 --}
 
--- This code requires an extension called lamba-case
+{-- This code requires an extension called lamba-case --}
 charParser :: Char -> Parser Char
 charParser c = Parser $ \case
     y:ys | y == c -> Just (ys, c)
@@ -117,8 +125,8 @@ jsonBool = f <$> (stringParser "true" <|> stringParser "false") where
 At this point I totally didn't understand what the spanParser is for.
 --}
 spanParser ::(Char -> Bool) -> Parser String
-spanParser f = Parser $ \input ->
-  let (token, rest) = span f input
+spanParser pred = Parser $ \input ->
+  let (token, rest) = span pred input
   in Just (rest, token)
 
 notNull :: Parser [a] -> Parser [a]
@@ -160,10 +168,6 @@ jsonArray = JsonArray <$> (charParser '[' *> ws *> elements <* ws <* charParser 
 jsonObject :: Parser JsonValue
 jsonObject = JsonObject <$> (charParser '{' *> ws *> sepBy (ws *> charParser ',' <* ws) pair <* ws <* charParser '}') where
   pair = (\k _ v -> (k, v)) <$> stringLiteral <*> (ws *> charParser ':' <* ws) <*> jsonValue
-
--- jsonObject :: Parser JsonValue
--- jsonObject = JsonObject <$> (charParser '{' *> ws *> ((ws *> charParser ',' <* ws) `sepBy` pairs) <* ws <* charParser '}') where
---   pairs = (\a _ c -> (a, c)) <$> stringParser <*> (ws *> charParser ':' <* ws) <*> jsonValue
 
 {--
 The general `jsonValue` parser is just a combination of all the other parsers.
