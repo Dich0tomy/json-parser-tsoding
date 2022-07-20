@@ -5,6 +5,8 @@
 import Control.Applicative
 -- To be able to use isDigit and isSpace.
 import GHC.Unicode
+-- To use (second)
+import Data.Bifunctor
 
 {--
 Jsonvalue is a new data type that has several constructors indicating it's possible values
@@ -40,11 +42,18 @@ The bare minimum for a Functor is to implement `fmap`, so we do just that.
 The do notation is still a little bit of a weirdness to me (quite imperative), but it.. works.
 Without I'd have to write some case expressions and shits I suppose.
 --}
+{-- 
+`second` is a bifunctor function with the following type `(b -> c) -> p a b -> p a c`
+--}
 instance Functor Parser where
-  fmap f (Parser p) = Parser $ 
-    \input -> do
-      (rest, a) <- p input
-      Just (rest, f a)
+  fmap f (Parser p) = Parser (fmap (second f) . p)
+
+{-- This is the original code --}
+-- instance Functor Parser where
+--   fmap f (Parser p) = Parser $
+--     \input -> do
+--       (rest, a) <- p input
+--       Just (rest, f a)
 
 {--
 Here we say that Parser is an Applicative and the operators on it look like follows.
@@ -101,7 +110,7 @@ charParser c = Parser $ \case
 
 {-- Apparently `traverse X` is the same as `map . sequenceA X`--}
 stringParser :: String -> Parser String
-stringParser = traverse charParser 
+stringParser = traverse charParser
 
 {--
 <$ is a Functor thing and it's basically like `(\_ -> JsonNull) <$> stringParser "null"`
@@ -147,7 +156,7 @@ jsonString :: Parser JsonValue
 jsonString = JsonString <$> stringLiteral
 
 ws :: Parser String
-ws = spanParser isSpace  
+ws = spanParser isSpace
 
 {--
 Now this is some fine magic here.
